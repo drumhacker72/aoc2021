@@ -1,5 +1,6 @@
 from std/sequtils import filter, map, toSeq
 from std/strscans import scanf
+import std/sugar
 import std/tables
 
 type
@@ -22,10 +23,11 @@ iterator points(line: Line, diagonals: bool): Point =
       inc(x, dx)
       inc(y, dy)
 
-let lines = io.lines("day5.txt").toSeq.map(func (line: string): Line =
-  var x1, y1, x2, y2: int
-  assert scanf(line, "$i,$i -> $i,$i$.", x1, y1, x2, y2)
-  (x1, y1, x2, y2))
+let lines: seq[Line] = collect:
+  for line in io.lines("day5.txt"):
+    var x1, y1, x2, y2: int
+    assert scanf(line, "$i,$i -> $i,$i$.", x1, y1, x2, y2)
+    (x1, y1, x2, y2)
 
 var counts1 = initCountTable[Point]()
 var counts2 = initCountTable[Point]()
@@ -36,7 +38,7 @@ for line in lines:
     counts2.inc(p)
 
 func countDangerous(counts: CountTable[Point]): int =
-  counts.values.toSeq.filter(func (x: int): bool = x >= 2).len
+  counts.values.toSeq.filter(x => x >= 2).len
 
 echo countDangerous(counts1)
 echo countDangerous(counts2)
