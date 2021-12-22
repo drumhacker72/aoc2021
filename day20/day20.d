@@ -27,10 +27,6 @@ struct Image {
         p.x = x;
         p.y = y;
         pixels.insert(p);
-        xMin = min(xMin, x);
-        xMax = max(xMax, x);
-        yMin = min(yMin, y);
-        yMax = max(yMax, y);
     }
 }
 
@@ -48,10 +44,14 @@ int findIndex(const ref Image img, int x, int y) {
 
 Image step(string algo, const ref Image img) {
     Image s;
+    s.xMin = img.xMin - 1;
+    s.xMax = img.xMax + 1;
+    s.yMin = img.yMin - 1;
+    s.yMax = img.yMax + 1;
     s.pixels = new RedBlackTree!Point();
     if (algo[0] == '#') s.default_ = !img.default_;
-    for (int x = img.xMin - 1; x <= img.xMax + 1; ++x) {
-        for (int y = img.yMin - 1; y <= img.yMax + 1; ++y) {
+    for (int x = s.xMin; x <= s.xMax; ++x) {
+        for (int y = s.yMin; y <= s.yMax; ++y) {
             if (algo[findIndex(img, x, y)] == '#') {
                 s.addPixel(x, y);
             }
@@ -73,8 +73,10 @@ void main() {
         for (int x = 0; x < row.length; ++x) {
             if (row[x] == '#') img.addPixel(x, y);
         }
+        img.xMax = max(img.xMax, cast(int) row.length);
         ++y;
     }
+    img.yMax = y-1;
     for (int i = 0; i < 2; ++i)
         img = step(algo, img);
     writeln(img.pixels.length);
