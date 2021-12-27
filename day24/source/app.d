@@ -49,44 +49,52 @@ Value parseValue(ParseTree value) {
 }
 
 struct Inp { int n; }
-struct AddT(Expr) { Expr* a; Expr* b; }
-struct MulT(Expr) { Expr* a; Expr* b; }
+class AddT(Expr) {
+    Expr a;
+    Expr b;
+    this(Expr a, Expr b) { this.a = a; this.b = b; }
+}
+class MulT(Expr) {
+    Expr a;
+    Expr b;
+    this(Expr a, Expr b) { this.a = a; this.b = b; }
+}
 
 alias Expr = SumType!(int, Inp, AddT!This, MulT!This);
 alias Add = Expr.Types[2];
 alias Mul = Expr.Types[3];
 
-Expr* evalValue(ref Expr*[Var] vars, Value value) {
+Expr evalValue(Expr[Var] vars, Value value) {
     return value.match!(
         (Var v) => vars[v],
-        (int n) => new Expr(n)
+        (int n) => Expr(n)
     );
 }
 
-Tuple!(Expr*, Expr*) divmod(Expr* aExpr, Expr* bExpr) {
-    int b = (*bExpr).tryMatch!((int b) => b);
-    return (*aExpr).tryMatch!(
-        (int a) => tuple(new Expr(a / b), new Expr(a % b)),
+Tuple!(Expr, Expr) divmod(Expr aExpr, Expr bExpr) {
+    int b = bExpr.tryMatch!((int b) => b);
+    return aExpr.tryMatch!(
+        (int a) => tuple(Expr(a / b), Expr(a % b)),
         (Mul a) {
-            if (*a.a == *bExpr) return tuple(a.b, new Expr(0));
-            else if (*a.b == *bExpr) return tuple(a.a, new Expr(0));
+            if (a.a == bExpr) return tuple(a.b, Expr(0));
+            else if (a.b == bExpr) return tuple(a.a, Expr(0));
             else assert(false);
         },
         (Add a) {
             alias doMatch = match!(
                 (Mul aa, _ab) {
-                    if (*aa.a == *bExpr) return tuple(aa.b, a.b);
-                    else if (*aa.b == *bExpr) return tuple(aa.a, a.b);
+                    if (aa.a == bExpr) return tuple(aa.b, a.b);
+                    else if (aa.b == bExpr) return tuple(aa.a, a.b);
                     else assert(false);
                 },
                 (_aa, Mul ab) {
-                    if (*ab.a == *bExpr) return tuple(ab.b, a.a);
-                    else if (*ab.b == *bExpr) return tuple(ab.a, a.a);
+                    if (ab.a == bExpr) return tuple(ab.b, a.a);
+                    else if (ab.b == bExpr) return tuple(ab.a, a.a);
                     else assert(false);
                 },
-                (_aa, _ab) { return tuple(new Expr(0), aExpr); }
+                (_aa, _ab) { return tuple(Expr(0), aExpr); }
             );
-            return doMatch(*a.a, *a.b);
+            return doMatch(a.a, a.b);
         }
     );
 }
@@ -95,75 +103,75 @@ string show(Expr expr) {
     return expr.match!(
         (int i) => to!string(i),
         (Inp i) => "i%s".format(i.n),
-        (Add add) => "(%s+%s)".format(show(*add.a), show(*add.b)),
-        (Mul mul) => "(%s*%s)".format(show(*mul.a), show(*mul.b))
+        (Add add) => "(%s+%s)".format(show(add.a), show(add.b)),
+        (Mul mul) => "(%s*%s)".format(show(mul.a), show(mul.b))
     );
 }
 
 alias Equation = Tuple!(Inp, int, Inp); // 0 + 1 == 2
 Equation[] equations;
 
-void eval(ref Expr*[Var] vars, ref int nextInput, ParseTree inst) {
+void eval(Expr[Var] vars, ref int nextInput, ParseTree inst) {
     auto var = parseVar(inst.children[0]);
     final switch (inst.name) {
         case "ALU.Inp":
-            vars[var] = new Expr(Inp(nextInput++));
+            vars[var] = Expr(Inp(nextInput++));
             break;
         case "ALU.Add":
             auto aExpr = vars[var];
             auto bExpr = evalValue(vars, parseValue(inst.children[1]));
             alias doMatch = match!(
-                (int a, int b) => new Expr(a + b),
+                (int a, int b) => Expr(a + b),
                 (int a, Add b) {
                     if (a == 0) return bExpr;
                     alias doMatch = match!(
-                        (int ba, _bb) => new Expr(Add(new Expr(a + ba), b.b)),
-                        (_ba, int bb) => new Expr(Add(b.a, new Expr(a + bb))),
-                        (_ba, _bb) => new Expr(Add(aExpr, bExpr))
+                        (int ba, _bb) => Expr(new Add(Expr(a + ba), b.b)),
+                        (_ba, int bb) => Expr(new Add(b.a, Expr(a + bb))),
+                        (_ba, _bb) => Expr(new Add(aExpr, bExpr))
                     );
-                    return doMatch(*b.a, *b.b);
+                    return doMatch(b.a, b.b);
                 },
-                (int a, _b) => a == 0 ? bExpr : new Expr(Add(aExpr, bExpr)),
+                (int a, _b) => a == 0 ? bExpr : Expr(new Add(aExpr, bExpr)),
                 (Add a, int b) {
                     if (b == 0) return aExpr;
                     alias doMatch = match!(
-                        (int aa, _ab) => new Expr(Add(new Expr(aa + b), a.b)),
-                        (_aa, int ab) => new Expr(Add(a.a, new Expr(ab + b))),
-                        (_aa, _ab) => new Expr(Add(aExpr, bExpr))
+                        (int aa, _ab) => Expr(new Add(Expr(aa + b), a.b)),
+                        (_aa, int ab) => Expr(new Add(a.a, Expr(ab + b))),
+                        (_aa, _ab) => Expr(new Add(aExpr, bExpr))
                     );
-                    return doMatch(*a.a, *a.b);
+                    return doMatch(a.a, a.b);
                 },
-                (_a, int b) => b == 0 ? aExpr : new Expr(Add(aExpr, bExpr)),
-                (_a, _b) => new Expr(Add(aExpr, bExpr))
+                (_a, int b) => b == 0 ? aExpr : Expr(new Add(aExpr, bExpr)),
+                (_a, _b) => Expr(new Add(aExpr, bExpr))
             );
-            vars[var] = doMatch(*aExpr, *bExpr);
+            vars[var] = doMatch(aExpr, bExpr);
             break;
         case "ALU.Mul":
             auto aExpr = vars[var];
             auto bExpr = evalValue(vars, parseValue(inst.children[1]));
             alias doMatch = match!(
-                (int a, int b) => new Expr(a * b),
+                (int a, int b) => Expr(a * b),
                 (int a, _b) {
                     switch (a) {
-                        case 0: return new Expr(0);
+                        case 0: return Expr(0);
                         case 1: return bExpr;
-                        default: return new Expr(Mul(aExpr, bExpr));
+                        default: return Expr(new Mul(aExpr, bExpr));
                     }
                 },
                 (_a, int b) {
                     switch (b) {
-                        case 0: return new Expr(0);
+                        case 0: return Expr(0);
                         case 1: return aExpr;
-                        default: return new Expr(Mul(aExpr, bExpr));
+                        default: return Expr(new Mul(aExpr, bExpr));
                     }
                 },
-                (_a, _b) => new Expr(Mul(aExpr, bExpr))
+                (_a, _b) => Expr(new Mul(aExpr, bExpr))
             );
-            vars[var] = doMatch(*aExpr, *bExpr);
+            vars[var] = doMatch(aExpr, bExpr);
             break;
         case "ALU.Div":
             auto bExpr = evalValue(vars, parseValue(inst.children[1]));
-            if (*bExpr != Expr(1)) {
+            if (bExpr != Expr(1)) {
                 auto dm = divmod(vars[var], bExpr);
                 vars[var] = dm[0];
             }
@@ -177,26 +185,26 @@ void eval(ref Expr*[Var] vars, ref int nextInput, ParseTree inst) {
             auto bExpr = evalValue(vars, parseValue(inst.children[1]));
             alias doMatch = tryMatch!(
                 (int a, int b) {
-                    vars[var] = new Expr(a == b ? 1 : 0);
+                    vars[var] = Expr(a == b ? 1 : 0);
                 },
                 (int a, Inp b) {
                     assert(a < 1 || a > 9);
-                    vars[var] = new Expr(0);
+                    vars[var] = Expr(0);
                 },
                 (Add a, Inp b) {
                     alias doMatch2 = tryMatch!(
                         (Inp aa, int ab) {
-                            if (ab < -8 || ab > 8) vars[var] = new Expr(0);
+                            if (ab < -8 || ab > 8) vars[var] = Expr(0);
                             else {
                                 equations ~= tuple(aa, ab, b);
-                                vars[var] = new Expr(1);
+                                vars[var] = Expr(1);
                             }
                         }
                     );
-                    doMatch2(*a.a, *a.b);
+                    doMatch2(a.a, a.b);
                 }
             );
-            doMatch(*aExpr, *bExpr);
+            doMatch(aExpr, bExpr);
     }
 }
 
@@ -214,11 +222,11 @@ void main() {
     auto alu = ALU(readText("day24.txt"));
     assert(alu.successful);
     auto program = alu.children[0];
-    Expr*[Var] vars;
-    vars[Var.w] = new Expr(0);
-    vars[Var.x] = new Expr(0);
-    vars[Var.y] = new Expr(0);
-    vars[Var.z] = new Expr(0);
+    Expr[Var] vars;
+    vars[Var.w] = Expr(0);
+    vars[Var.x] = Expr(0);
+    vars[Var.y] = Expr(0);
+    vars[Var.z] = Expr(0);
     int nextInput;
     foreach (inst; program.children) {
         eval(vars, nextInput, inst.children[0]);
