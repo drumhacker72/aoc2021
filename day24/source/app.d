@@ -49,20 +49,18 @@ Value parseValue(ParseTree value) {
 }
 
 struct Inp { int n; }
-class AddT(Expr) {
+class Add {
     Expr a;
     Expr b;
     this(Expr a, Expr b) { this.a = a; this.b = b; }
 }
-class MulT(Expr) {
+class Mul {
     Expr a;
     Expr b;
     this(Expr a, Expr b) { this.a = a; this.b = b; }
 }
 
-alias Expr = SumType!(int, Inp, AddT!This, MulT!This);
-alias Add = Expr.Types[2];
-alias Mul = Expr.Types[3];
+alias Expr = SumType!(int, Inp, Add, Mul);
 
 Expr evalValue(Expr[Var] vars, Value value) {
     return value.match!(
